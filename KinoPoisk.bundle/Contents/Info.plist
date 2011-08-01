@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>Russian</string>
+	<key>CFBundleExecutable</key>
+	<string>KinoPoisk</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.plexapp.agents.kinopoisk</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>1.0</string>
+	<key>PlexAgentAttributionText</key>
+	<string>
+    Take media info, covers and fanart from &lt;a href="http://kinopoisk.ru/"&gt;Kinopoisk.ru&lt;/a&gt; (Russian only) / 
+Плагин получает информацию о медиафайле с сайта &lt;a href="http://kinopoisk.ru/"&gt;Kinopoisk.ru&lt;/a&gt;. Такие дела.
+  </string>
+	<key>PlexFrameworkVersion</key>
+	<string>2</string>
+	<key>PlexPluginMode</key>
+	<string>AlwaysOn</string>
+</dict>
+</plist>
