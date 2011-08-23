@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*- 
 import datetime, re, time, unicodedata
 
-KINOPISK_BASE = 'http://www.kinopoisk.ru/'
+KINOPOISK_BASE = 'http://www.kinopoisk.ru/'
 KINOPOISK_SEARCH = 'http://www.kinopoisk.ru/index.php?first=no&kp_query=%s'
 KINOPOISK_MAIN = 'http://www.kinopoisk.ru/level/1/film/%s/'
 KINOPOISK_PEOPLE = 'http://www.kinopoisk.ru/level/19/film/%s/'
 KINOPOISK_STUDIO = 'http://www.kinopoisk.ru/level/91/film/%s/'
 KINOPOISK_POSTERS = 'http://www.kinopoisk.ru/level/17/film/%s/page/%d/'
+KINOPOISK_ART = 'http://www.kinopoisk.ru/level/13/film/%s/page/%d/'
 DEFAULT_MPAA = u'R'
 MPAA_AGE = {u'G': 0, u'PG': 11, u'PG-13': 13, u'R': 16, u'NC-17': 17}
 
@@ -110,13 +111,11 @@ class KinopoiskAgent(Agent.Movies):
         
         lactors = page.xpath('//td[@class="actor_list"]/span')
         metadata.roles.clear()
-        Log("======= Actors cleared")
         for inf_ in lactors:
           info_buf = inf_.xpath('./a[contains(@href,"/level/4/people/")]/text()')
           if len(info_buf):
             for actor in info_buf:
               if actor != u'...':
-                Log("======= Actor found " + actor)
                 role = metadata.roles.new()
                 role.actor = actor
  
@@ -214,74 +213,8 @@ class KinopoiskAgent(Agent.Movies):
           info_buf = ' '.join(info_buf)
           info_buf = self.replace_gomno(info_buf)
           metadata.summary = info_buf.strip()
-              
-    
-    #test
-#        try:
-#          info_buf = None
-#          info_buf = page.xpath('//span[contains(@style,"font-size: 13px")]/text()')[0].strip()
-#          if info_buf:
-#            media.name = info_buf
-#            media.guid = None
-#            Log('KName-'+media.name)
-#            Log('KGUID-'+media.guid)
-#        except:
-#          pass      
           
-  #Люди разные
-      page =  self.XMLElementFromURLWithRetries(KINOPOISK_PEOPLE % metadata.id)
-      if page:
-        people_type = None
-        peoples = page.xpath('//div[@id="content_block"]/table/tbody/tr/td/div[@class="movie"]/table/tbody/tr/td[@class="actor_list"]/*')
-        for info_buf in peoples:
-          try:
-            if info_buf.tag == u'table':
-              info_buf = info_buf.xpath('./tr/td[@style="padding-left:20px;border-bottom:2px solid #f60;font-size:16px"]/text()')
-              if info_buf[0] == u'Актеры':
-                people_type = 'role'
-                metadata.roles.clear()
-                
-              elif info_buf[0] == u'Режиссеры':
-                people_type = 'director'
-                metadata.directors.clear()
-              
-              elif info_buf[0] == u'Сценаристы':
-                people_type = 'writer'
-                metadata.writers.clear()
-              
-              else:
-                people_type = None  
-          except:
-            pass
-          try:   
-            if people_type != None and info_buf.tag == u'div':
-              
-              if people_type == 'role':
-
-    #metadata.roles.clear()
-    #for member in cast:
-    #    role = metadata.roles.new()
-    #    role.role = character_name
-    #    role.photo = headshot_url
-    #    role.actor = actor_name
-    
-                role = metadata.roles.new()
-                role.actor = info_buf.xpath('./p/a/text()')[0].strip(u' .')
-                role.role = info_buf.xpath('./p/text()')[0].strip(u' .')
-                info_buf = info_buf.xpath('./a/img/attribute::src')
-                if not(info_buf[0].endswith('no-poster.gif')):
-                  role.photo = KINOPISK_BASE + info_buf[0].lstrip('/')
-                
-     #         elif people_type == 'director':
-     #           metadata.directors.add(info_buf.xpath('./p/a/text()')[0].strip(u' .'))
-
-     #         elif people_type == 'writer':
-     #           metadata.writers.add(info_buf.xpath('./p/a/text()')[0].strip(u' .'))
-
-          except:
-            pass      
-
-      
+     
     # Постеры
       page =  self.XMLElementFromURLWithRetries(KINOPOISK_POSTERS % (metadata.id, 1))
       pages =[]
@@ -307,7 +240,7 @@ class KinopoiskAgent(Agent.Movies):
           info_buf = page.xpath('//table[@class="fotos" or @class="fotos fotos1" or @class="fotos fotos2"]/tr/td/a/attribute::href')
           for imageUrl in info_buf:
            # Получаем страницу с картинкою
-            page = self.XMLElementFromURLWithRetries(KINOPISK_BASE + imageUrl.lstrip('/'))
+            page = self.XMLElementFromURLWithRetries(KINOPOISK_BASE + imageUrl.lstrip('/'))
             imageUrl = page.xpath('//table[@id="main_table"]/tr/td/a/img/attribute::src')
             if len(imageUrl) == 0:
                imageUrl = page.xpath('//table[@id="main_table"]/tr/td/img/attribute::src')
@@ -320,6 +253,43 @@ class KinopoiskAgent(Agent.Movies):
                 except:
                   pass
           
+    # Задники
+      page =  self.XMLElementFromURLWithRetries(KINOPOISK_ART % (metadata.id, 1))
+      pages =[]
+      
+      # получение урлов
+      if page:
+        pages.append(page)
+        nav = page.xpath('//div[@class="navigator"]/ul/li[@class="arr"]/a')
+        if nav:
+          nav = nav[-1].xpath('./attribute::href')[0]
+          nav = re.search('page\/(\d+?)\/$', nav)
+          try:
+            for p_i in range(2, int(nav.groups(1)[0]) + 1):
+              page =  self.XMLElementFromURLWithRetries(KINOPOISK_ART % (metadata.id, p_i))
+              if page:
+                pages.append(page)
+          except:
+            pass
+      
+      # Получение урлов задников            
+      if len(pages):
+        for page in pages:
+          info_buf = page.xpath('//table[@class="fotos" or @class="fotos fotos1" or @class="fotos fotos2"]/tr/td/a/attribute::href')
+          for imageUrl in info_buf:
+           # Получаем страницу с картинкою
+            page = self.XMLElementFromURLWithRetries(KINOPOISK_BASE + imageUrl.lstrip('/'))
+            imageUrl = page.xpath('//table[@id="main_table"]/tr/td/a/img/attribute::src')
+            if len(imageUrl) == 0:
+               imageUrl = page.xpath('//table[@id="main_table"]/tr/td/img/attribute::src')
+            if len(imageUrl) == 1:
+              imageUrl = imageUrl[0]
+              name = imageUrl.split('/')[-1]
+              if name not in metadata.art:
+                try:
+                  metadata.art[name] = Proxy.Media(HTTP.Request(imageUrl), sort_order = 1)
+                except:
+                  pass
 
     # Студия
       page = self.XMLElementFromURLWithRetries(KINOPOISK_STUDIO % metadata.id)
