@@ -136,7 +136,11 @@ class KinopoiskAgent(Agent.Movies):
                 for director in info_buf:
                   if director != u'...':
                     metadata.directors.add(director)
-                    Log("======= Director found " + director)
+          #Год
+            if info_buf[0] == u'год':
+              info_buf = inf_.xpath('.//a/text()')
+              if len(info_buf):
+                metadata.year = int(info_buf[0])
           #Сценаристы
             if info_buf[0] == u'сценарий':
               info_buf = inf_.xpath('.//a/text()')
@@ -144,11 +148,6 @@ class KinopoiskAgent(Agent.Movies):
                 for writer in info_buf:
                   if writer != u'...':
                     metadata.writers.add(writer)
-          #Год
-            if info_buf[0] == u'год':
-              info_buf = inf_.xpath('.//a/text()')
-              if len(info_buf) == 1:
-                metadata.year = int(info_buf[0])
           #Жанры
             elif info_buf[0] == u'жанр':
               info_buf = inf_.xpath('.//a/text()')
@@ -252,6 +251,14 @@ class KinopoiskAgent(Agent.Movies):
                   metadata.posters[name] = Proxy.Media(HTTP.Request(imageUrl), sort_order = 1)
                 except:
                   pass
+      
+      # Последняя надежда — на всякий случай забираем картинку низкого качества
+      try:
+        imageUrl = 'http://st.kinopoisk.ru/images/film/' + metadata.id + '.jpg'
+        name = imageUrl.split('/')[-1]
+        metadata.posters[name] = Proxy.Media(HTTP.Request(imageUrl), sort_order = 1)
+      except:
+        pass
           
     # Задники
       page =  self.XMLElementFromURLWithRetries(KINOPOISK_ART % (metadata.id, 1))
