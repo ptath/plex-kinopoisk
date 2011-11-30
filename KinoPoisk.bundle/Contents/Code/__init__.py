@@ -1,40 +1,47 @@
 # -*- coding: utf-8 -*- 
 import datetime, re, time, unicodedata
 
+# Разные страницы сайта
 KINOPOISK_BASE = 'http://www.kinopoisk.ru/'
-KINOPOISK_SEARCH = 'http://www.kinopoisk.ru/index.php?first=no&kp_query=%s'
 KINOPOISK_MAIN = 'http://www.kinopoisk.ru/level/1/film/%s/'
 KINOPOISK_PEOPLE = 'http://www.kinopoisk.ru/level/19/film/%s/'
 KINOPOISK_STUDIO = 'http://www.kinopoisk.ru/level/91/film/%s/'
 KINOPOISK_POSTERS = 'http://www.kinopoisk.ru/level/17/film/%s/page/%d/'
 KINOPOISK_ART = 'http://www.kinopoisk.ru/level/13/film/%s/page/%d/'
+
+# Страница поиска
+KINOPOISK_SEARCH = 'http://www.kinopoisk.ru/index.php?first=no&kp_query=%s'
+
+# Рейтинги
 DEFAULT_MPAA = u'R'
 MPAA_AGE = {u'G': 0, u'PG': 11, u'PG-13': 13, u'R': 16, u'NC-17': 17}
 
+# Русские месяца, пригодится для определения дат
 RU_MONTH = {u'января': '01', u'февраля': '02', u'марта': '03', u'апреля': '04', u'мая': '05', u'июня': '06', u'июля': '07', u'августа': '08', u'сентября': '09', u'октября': '10', u'ноября': '11', u'декабря': '12'}
 
-UserAgent = 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_3; en-us) AppleWebKit/533.16 (KHTML, like Gecko) Version/5.0 Safari/533.16'
+# Под кого маскируемся =)
+UserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_2) AppleWebKit/534.51.22 (KHTML, like Gecko) Version/5.1.1 Safari/534.51.22'
 
 def Start():
   HTTP.CacheTime = CACHE_1DAY
   
 class KinopoiskAgent(Agent.Movies):
   name = 'KinoPoisk'
-  # Надо облагородить, а то так и отображается — ru
   languages = [Locale.Language.Russian]
   
+  # Функция для получения html-содержимого
   def httpRequest(self, url):
     time.sleep(1)
     res = None
-    for i in range(5):
+    for i in range(3):
       try: 
-        res = HTTP.Request(url, headers = {'User-agent': UserAgent})
+        res = HTTP.Request(url, headers = {'User-agent': UserAgent, 'Accept': 'text/html'})
       except: 
         Log("Error hitting HTTP url:", url)
         time.sleep(1)
-        
     return res
-      
+  
+  # Функция преобразования html-кода в xml-код    
   def XMLElementFromURLWithRetries(self, url, code_page = None):
     res = self.httpRequest(url)
     if res:
@@ -42,25 +49,31 @@ class KinopoiskAgent(Agent.Movies):
         res = str(res).decode(code_page)
       return HTML.ElementFromString(res)
     return None
-
+  
+  # Функция для замены специальных символов
   def replace_gomno(self, text_):
-   # блядская замена 3-х точек и т.д.
     res = text_.replace(u'\x85', u'...')
     res = res.replace(u'\x97', u'-')
     return res
-
+  
+  # Начало собственно поиска  
   def search(self, results, media, lang):
    
+    # Кодируем в понятный для сайта вид название фильма
     normalizedName = media.name.decode('utf-8')
     normalizedName = unicodedata.normalize('NFC', normalizedName)
     normalizedName = String.Quote(normalizedName.encode('cp1251'),True)
     
+    # Получаем страницу поиска
     page =  self.XMLElementFromURLWithRetries(KINOPOISK_SEARCH % normalizedName)
     if page:
+      
+      # Если страница получена, берем с нее перечень всех названий фильмов
       info_buf = page.xpath(u'//self::div[@class="info"]/p[@class="name"]/a[contains(@href,"/level/1/film/")]/..')
       score = 99
+      
+      # Если не нашли там текст названия, значит сайт сразу дал нам страницу с фильмом (хочется верить =)
       if not len(info_buf):
-      #Только одна страница
         try:
           title = page.xpath('//h1[@class="moviename-big"]/text()')[0].strip()
           id = re.search('\/film\/(.+?)\/', page.xpath('//a[contains(@href,"/level/19/film/")]/attribute::href')[0]).groups(1)[0]
@@ -71,9 +84,9 @@ class KinopoiskAgent(Agent.Movies):
 
         except:
           pass
-          
+      
+      # Если    
       else:
-      # Нормально
         for td_ in info_buf:
           try:
             # получение ID
@@ -89,26 +102,24 @@ class KinopoiskAgent(Agent.Movies):
           except:
             pass
             
-
+    # Сортируем результаты
     results.Sort('year', descending=True)
-    
-  #
-  # 
-  #     
+  
+  # Обновляем данные о фильме в медиатеке  
   def update(self, metadata, media, lang):
-
-    # Set the title.
+    
+    # Название
     metadata.title = media.title
-#    metadata.year = year
-	
+    	
     if metadata.id:
-		# Получаем основную страницу с кинопоиска
+	  # Получаем страницу фильма
       page =  self.XMLElementFromURLWithRetries(KINOPOISK_MAIN % metadata.id)
       if page:
         
         #Сброс рейтинга MPAA
         metadata.content_rating = None
         
+        # Актёры
         lactors = page.xpath('//td[@class="actor_list"]/span')
         metadata.roles.clear()
         for inf_ in lactors:
@@ -119,6 +130,7 @@ class KinopoiskAgent(Agent.Movies):
                 role = metadata.roles.new()
                 role.actor = actor
  
+        # Название на оригинальном языке
         otitle = page.xpath('//span[@style="color: #666; font-size: 13px"]/text()')
         if len(otitle):
           otitle = ' '.join(otitle)
@@ -129,40 +141,46 @@ class KinopoiskAgent(Agent.Movies):
         for inf_ in info:
           info_buf =  inf_.xpath('./td[@class="type"]/text()')
           if len(info_buf) == 1:
-          #Режиссер
+          
+          # Режиссер
             if info_buf[0] == u'режиссер':
               info_buf = inf_.xpath('.//a/text()')
               if len(info_buf):
                 for director in info_buf:
                   if director != u'...':
                     metadata.directors.add(director)
-          #Год
+          
+          # Год
             if info_buf[0] == u'год':
               info_buf = inf_.xpath('.//a/text()')
               if len(info_buf):
                 metadata.year = int(info_buf[0])
-          #Сценаристы
+          
+          # Сценаристы
             if info_buf[0] == u'сценарий':
               info_buf = inf_.xpath('.//a/text()')
               if len(info_buf):
                 for writer in info_buf:
                   if writer != u'...':
                     metadata.writers.add(writer)
-          #Жанры
+          
+          # Жанры
             elif info_buf[0] == u'жанр':
               info_buf = inf_.xpath('.//a/text()')
               if len(info_buf):
                 for genre in info_buf:
                   if genre != u'...':
                     metadata.genres.add(genre)
-          #Слоган
+          
+          # Слоган
             elif info_buf[0] == u'слоган':
               info_buf = inf_.xpath('./td[@style]/text()')
               if len(info_buf):
                 info_buf = ' '.join(info_buf)
                 info_buf = self.replace_gomno(info_buf)
                 metadata.tagline = info_buf.strip('- ')
-          #рейтинг MPAA
+          
+          # Рейтинг MPAA
             elif info_buf[0] == u'рейтинг MPAA':
               info_buf = inf_.xpath('.//a/img/attribute::src')
               if len(info_buf) == 1:
@@ -170,7 +188,7 @@ class KinopoiskAgent(Agent.Movies):
                 if info_buf:
                   metadata.content_rating = info_buf.groups(1)[0]
 
-          #Время
+          # Время
             elif info_buf[0] == u'время':
               info_buf = inf_.xpath('./td[@class="time"]/text()')
               if len(info_buf) == 1:
@@ -182,7 +200,7 @@ class KinopoiskAgent(Agent.Movies):
           # Премьера в мире
             elif info_buf[0] == u'премьера (мир)':
               info_buf = inf_.xpath('.//a/text()')
-              if len(info_buf) == 1:
+              if len(info_buf):
                 try:
                   (dd, mm, yy) = info_buf[0].split()
                   if len(dd) == 1: dd = '0' + dd 
@@ -192,33 +210,35 @@ class KinopoiskAgent(Agent.Movies):
                   pass
             
 
-        #рейтинг MPAA defaults
-        
+        # Рейтинг MPAA defaults
         if (metadata.content_rating) == 'None':
           metadata.content_rating = DEFAULT_MPAA
-        #рейтинг MPAA age
+        # Рейтинг MPAA age
         try:
           metadata.content_rating_age = MPAA_AGE[metadata.content_rating]
         except:
           pass
         
     # Рейтинг
-        info_buf = page.xpath('//form[@class="rating_stars"]/div[@id="block_rating"]//a[@href="/level/83/film/'+metadata.id+'/"]/text()')
-        if len(info_buf) == 1:
-          metadata.rating = float(info_buf[0])
+        info_buf = page.xpath('//form[@class="rating_stars"]/div[@id="block_rating"]//a[@href="/level/83/film/'+metadata.id+'/"]/span/text()')
+        if len(info_buf):
+          try:
+            metadata.rating = float(info_buf[0])
+          except:
+            pass
+          
     # Описание      
         info_buf = page.xpath('//div[@class="block_left_padtop"]/table/tr/td/table/tr/td/span[@class="_reachbanner_"]/div/text()')
         if len(info_buf):
           info_buf = ' '.join(info_buf)
           info_buf = self.replace_gomno(info_buf)
           metadata.summary = info_buf.strip()
-          
      
     # Постеры
-      page =  self.XMLElementFromURLWithRetries(KINOPOISK_POSTERS % (metadata.id, 1))
-      pages =[]
+      page = self.XMLElementFromURLWithRetries(KINOPOISK_POSTERS % (metadata.id, 1))
+      pages = []
       
-      # получение урлов
+      # Получение адресов постеров
       if page:
         pages.append(page)
         nav = page.xpath('//div[@class="navigator"]/ul/li[@class="arr"]/a')
@@ -261,10 +281,10 @@ class KinopoiskAgent(Agent.Movies):
         pass
           
     # Задники
-      page =  self.XMLElementFromURLWithRetries(KINOPOISK_ART % (metadata.id, 1))
-      pages =[]
+      page = self.XMLElementFromURLWithRetries(KINOPOISK_ART % (metadata.id, 1))
+      pages = []
       
-      # получение урлов
+      # Получение адресов задников
       if page:
         pages.append(page)
         nav = page.xpath('//div[@class="navigator"]/ul/li[@class="arr"]/a')
@@ -303,12 +323,5 @@ class KinopoiskAgent(Agent.Movies):
       if page:
         info_buf = page.xpath(u'//table/tr/td[b="Производство:"]/../following-sibling::tr/td/a/text()')
         if len(info_buf):
-          # Берем 1 студию
-          metadata.studio = info_buf[0].strip()
- 
- 
-    #metadata.trivia = ""
-    #metadata.quotes = ""
-    #metadata.originally_available_at = Datetime.ParseDate(info_dict["Release Date"].text.strip().split('(')[0]).date()
-    #metadata.tags.add(tag)
-    
+          # Берем только первую студию
+          metadata.studio = info_buf[0].strip() 
