@@ -20,7 +20,7 @@ MPAA_AGE = {u'G': 0, u'PG': 11, u'PG-13': 13, u'R': 16, u'NC-17': 17}
 RU_MONTH = {u'января': '01', u'февраля': '02', u'марта': '03', u'апреля': '04', u'мая': '05', u'июня': '06', u'июля': '07', u'августа': '08', u'сентября': '09', u'октября': '10', u'ноября': '11', u'декабря': '12'}
 
 # Под кого маскируемся =)
-UserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_2) AppleWebKit/534.51.22 (KHTML, like Gecko) Version/5.1.1 Safari/534.51.22'
+UserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_3) AppleWebKit/534.53.11 (KHTML, like Gecko) Version/5.1.3 Safari/534.53.10'
 
 def Start():
   HTTP.CacheTime = CACHE_1DAY
@@ -120,7 +120,7 @@ class KinopoiskAgent(Agent.Movies):
         metadata.content_rating = None
         
         # Актёры
-        lactors = page.xpath('//td[@class="actor_list"]/span')
+        lactors = page.xpath('//td[@class="actor_list"]/div/span')
         metadata.roles.clear()
         for inf_ in lactors:
           info_buf = inf_.xpath('./a[contains(@href,"/level/4/people/")]/text()')
